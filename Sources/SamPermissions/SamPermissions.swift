@@ -28,6 +28,16 @@ public final class SamPermissions {
     private var settingsChanged = false
     private var watch: Task<Void, Never>?
     private var tccToken: Int32 = 0
+    private var reopenWaiter: (process: Process, pane: PermissionFlowPane)?
+
+    /// Call when the app refused the quit that a reopen asked for. Stops the waiting reopen, so a later
+    /// quit does not start the app again, and returns the pane to tell the user about, or nil.
+    public func cancelReopen() -> PermissionFlowPane? {
+        guard let waiter = reopenWaiter else { return nil }
+        reopenWaiter = nil
+        waiter.process.terminate()
+        return waiter.pane
+    }
 
     private init() {
         PermissionFlowScreenRecordingStatus.register()
@@ -142,6 +152,7 @@ public final class SamPermissions {
         process.arguments = ["-c", script, "reopen", String(getpid()), Bundle.main.bundlePath]
             + reopenArguments(pane) + arguments
         do { try process.run() } catch { return }
+        reopenWaiter = (process, pane)
         // Not inline: terminate's wait loop would block the main actor that the quit steps need.
         NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
     }
