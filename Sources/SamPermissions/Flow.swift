@@ -1,5 +1,5 @@
 import Foundation
-import PermissionFlow
+@_exported import PermissionFlow
 
 public enum Access: String, Sendable, Codable {
     case granted, notAsked, denied
