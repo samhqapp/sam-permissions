@@ -3,6 +3,26 @@ import Testing
 @testable import SamPermissions
 
 struct FlowTests {
+    @Test func grantedHasNoReason() {
+        #expect(Flow.reason(.granted, identityChanged: true) == nil)
+    }
+
+    @Test func neverAskedIsNotAllowed() {
+        #expect(Flow.reason(.notAsked, identityChanged: false) == .notAllowed)
+    }
+
+    @Test func switchedOffOrResetIsNotAllowed() {
+        #expect(Flow.reason(.denied, identityChanged: false) == .notAllowed)
+    }
+
+    @Test func oldSignatureIsStaleGrant() {
+        #expect(Flow.reason(.denied, identityChanged: true) == .staleGrant)
+    }
+
+    @Test func switchOnBeforeStartNeedsRelaunch() {
+        #expect(Flow.reason(.needsRelaunch, identityChanged: false) == .needsRelaunch)
+    }
+
     @Test func preflightWins() {
         #expect(Flow.access(Reading(preflight: true, titledWindows: 0), asked: true, reopenedForGrant: true) == .granted)
     }

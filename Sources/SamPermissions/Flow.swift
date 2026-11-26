@@ -21,6 +21,16 @@ public struct Reading: Equatable, Sendable {
     }
 }
 
+/// Why access is missing, for the line the app shows beside Fix.
+public enum Reason: String, Sendable {
+    /// Never asked, switched off, or reset.
+    case notAllowed
+    /// The switch is on for an old signature of this app, so macOS still denies access.
+    case staleGrant
+    /// The switch is on, but this process started before it.
+    case needsRelaunch
+}
+
 /// What one click on Fix does.
 public enum Step: String, Sendable {
     case nothing, prompt, openPane, reset, reopen
@@ -37,6 +47,16 @@ public enum Flow {
         // After our own reopen a new process must see the grant; titles without it mean the probe is wrong.
         if (reading.titledWindows ?? 0) > 0, !reopenedForGrant { return .needsRelaunch }
         return asked ? .denied : .notAsked
+    }
+
+    /// nil when granted.
+    public static func reason(_ access: Access, identityChanged: Bool) -> Reason? {
+        switch access {
+        case .granted: return nil
+        case .needsRelaunch: return .needsRelaunch
+        case .notAsked: return .notAllowed
+        case .denied: return identityChanged ? .staleGrant : .notAllowed
+        }
     }
 
     /// - Parameters:

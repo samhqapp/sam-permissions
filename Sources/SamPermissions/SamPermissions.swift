@@ -60,6 +60,11 @@ public final class SamPermissions {
         return access
     }
 
+    /// Why access is missing, or nil when granted.
+    public func reason(_ pane: PermissionFlowPane) -> Reason? {
+        Flow.reason(access(pane), identityChanged: identityChanged(pane))
+    }
+
     // MARK: Fix
 
     /// The one Fix button. Picks the step for the current state. Call only from a click.
