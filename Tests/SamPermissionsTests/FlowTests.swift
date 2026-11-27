@@ -113,4 +113,11 @@ struct FlowTests {
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask", "screenRecording"]) == .screenRecording)
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask"]) == nil)
     }
+
+    @MainActor @Test func appStatusReplacesBuiltInRead() async {
+        #expect(await SamPermissions.status(.loginItems, allowed: { false }) { _ in true } == false)
+        #expect(await SamPermissions.status(.loginItems, allowed: { true }) { _ in false } == true)
+        #expect(await SamPermissions.status(.permission(.camera), allowed: nil) { _ in true } == true)
+        #expect(await SamPermissions.status(.localNetwork, allowed: nil) { _ in true } == nil)
+    }
 }

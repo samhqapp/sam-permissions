@@ -158,15 +158,11 @@ public final class SamPermissions {
 
     /// Opens a Settings page with the guide panel beside it, such as Login Items for a helper or Automation for
     /// Apple Events. Call from a click; `source` is the button's frame in screen coordinates.
-    public func guide(_ page: SettingsPage, from source: CGRect? = nil) {
-        if case .permission(let pane) = page { return guide(pane, from: source) }
-        show(page, from: source)
-    }
-
-    /// Closes the panel beside System Settings, such as when the app reads its own helper's approval.
-    public func closeGuide() {
-        flow.closePanel()
-        settingsGuide.close()
+    /// `allowed` replaces the built-in status read, such as a daemon helper's own `SMAppService` status;
+    /// the panel closes once it returns true.
+    public func guide(_ page: SettingsPage, from source: CGRect? = nil, allowed: (@MainActor () -> Bool)? = nil) {
+        if case .permission(let pane) = page, allowed == nil { return guide(pane, from: source) }
+        show(page, from: source, allowed: allowed)
     }
 
     private func guide(_ pane: PermissionFlowPane, from source: CGRect?) {
@@ -180,13 +176,20 @@ public final class SamPermissions {
         follow(pane)
     }
 
-    private func show(_ page: SettingsPage, from source: CGRect?) {
+    private func show(_ page: SettingsPage, from source: CGRect?, allowed: (@MainActor () -> Bool)? = nil) {
         flow.closePanel()
         NSWorkspace.shared.open(page.url)
         settingsGuide.show(page, from: source) { [weak self] in
-            if case .permission(let pane) = page { return self?.access(pane) == .granted }
-            return await page.granted()
+            await Self.status(page, allowed: allowed) { self?.access($0) == .granted }
         }
+    }
+
+    /// The panel's once-a-second read: the app's own `allowed` first, else SamPermissions' read of the page.
+    static func status(_ page: SettingsPage, allowed: (@MainActor () -> Bool)?,
+                       granted: (PermissionFlowPane) -> Bool) async -> Bool? {
+        if let allowed { return allowed() }
+        if case .permission(let pane) = page { return granted(pane) }
+        return await page.granted()
     }
 
     /// Reads once a second for 10 min. A Screen Recording switch that goes on reopens the app by itself.
