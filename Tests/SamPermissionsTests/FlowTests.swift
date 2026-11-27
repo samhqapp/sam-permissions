@@ -50,6 +50,10 @@ struct FlowTests {
         #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: true, tries: 1, settingsChanged: true) == .reopen)
     }
 
+    @Test func denyAtPromptThenFixOpensPane() {
+        #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: false, tries: 0, settingsChanged: true) == .openPane)
+    }
+
     @Test func oldSignatureResets() {
         #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: true, tries: 0, settingsChanged: false) == .reset)
         #expect(Flow.step(.denied, pane: .accessibility, identityChanged: false, tries: 1, settingsChanged: false) == .reset)

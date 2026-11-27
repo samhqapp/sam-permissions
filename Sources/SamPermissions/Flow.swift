@@ -70,10 +70,11 @@ public enum Flow {
         case .notAsked: return .prompt
         case .denied:
             if tries + 1 >= loopTries { return .openPane }
-            // The switch may be on but unseen by this process: reopen first, never wipe a good grant.
-            if pane == .screenRecording, settingsChanged { return .reopen }
             // A row from an old signature stays on but denies us; a second click without change repairs it.
-            return identityChanged || tries >= 1 ? .reset : .openPane
+            guard identityChanged || tries >= 1 else { return .openPane }
+            // The switch may be on but unseen by this process: reopen before a reset, never wipe a good grant.
+            // A Deny answer to the system prompt also changes settings, so the first click still opens the pane.
+            return pane == .screenRecording && settingsChanged ? .reopen : .reset
         }
     }
 }
