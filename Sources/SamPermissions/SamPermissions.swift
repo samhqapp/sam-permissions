@@ -1,14 +1,19 @@
 import AppKit
 import ApplicationServices
+import IOKit.hid
 import notify
 import PermissionFlow
-import PermissionFlowScreenRecordingStatus
+import PermissionFlowCameraStatus
+import PermissionFlowExtendedStatus
 import Security
 
-/// One Fix button for Accessibility and Screen Recording. PermissionFlow opens the pane and shows its panel beside
-/// System Settings; this layer adds stale-grant repair, the self-reopen, and the loop report.
+/// One Fix button for every macOS privacy permission. PermissionFlow opens the pane and shows its panel beside
+/// System Settings; this layer adds the macOS requests, stale-grant repair, the self-reopen, and the loop report.
 @MainActor
 public final class SamPermissions {
+    /// The panel tracks System Settings from window-server bounds. Prompting for Accessibility here would give
+    /// every app an extra prompt just for smoother following, so it stays off (pinned by a test).
+    static let flowConfiguration = PermissionFlowConfiguration(promptForAccessibilityTrust: false)
     public static let shared = SamPermissions()
     public static let askArgument = "--sam-permission-ask"
     public static let resumeArgument = "--sam-permission-resume"
@@ -23,7 +28,7 @@ public final class SamPermissions {
     public var canReopen: () -> Bool = { true }
 
     private let defaults = UserDefaults.standard
-    private let flow = PermissionFlowController()
+    private let flow = PermissionFlowController(configuration: flowConfiguration)
     private var resumed: PermissionFlowPane?
     private var settingsChanged = false
     private var watch: Task<Void, Never>?
@@ -40,7 +45,7 @@ public final class SamPermissions {
     }
 
     private init() {
-        PermissionFlowScreenRecordingStatus.register()
+        PermissionFlowExtendedStatus.register()
         notify_register_dispatch("com.apple.tcc.access.changed", &tccToken, .main) { _ in
             MainActor.assumeIsolated { SamPermissions.shared.settingsChanged = true }
         }
@@ -68,6 +73,7 @@ public final class SamPermissions {
     // MARK: Fix
 
     /// The one Fix button. Picks the step for the current state. Call only from a click.
+    /// `source` is the button's frame in screen coordinates; the panel flies out of it. nil: no fly-out.
     public func resolve(_ pane: PermissionFlowPane, from source: CGRect? = nil) {
         let access = access(pane)
         let tries = recentTries(pane)
@@ -98,23 +104,55 @@ public final class SamPermissions {
     /// First use of a feature, such as a capture hotkey. `confirm` shows the app's own explanation and returns
     /// true to go on. Only the first call explains and asks macOS; a Cancel or Deny is remembered, and every
     /// later call returns `.denied` with no prompt, so the app shows its Fix banner instead.
+    /// Microphone, camera, calendars, and reminders answer later: use `requestAccess`. Here they start the
+    /// macOS request, return `.denied`, and call `onChange` once the user allows.
     public func request(_ pane: PermissionFlowPane, confirm: () -> Bool) -> Answer {
-        Flow.request(access(pane), confirm: confirm, ask: { askSystem(pane) },
+        Flow.request(access(pane), confirm: confirm, ask: { askNow(pane) ?? askInBackground(pane) },
                      markAsked: { defaults.set(true, forKey: key("asked", pane)) })
+    }
+
+    /// `request` that waits for the user's answer to the macOS prompt, for every pane.
+    public func requestAccess(_ pane: PermissionFlowPane, confirm: () -> Bool) async -> Answer {
+        if let answer = Flow.gate(access(pane), confirm: confirm,
+                                  markAsked: { defaults.set(true, forKey: key("asked", pane)) }) { return answer }
+        return await askSystem(pane) ? .granted : .denied
     }
 
     private func ask(_ pane: PermissionFlowPane, from source: CGRect?) {
         defaults.set(true, forKey: key("asked", pane))
-        _ = askSystem(pane)
-        guide(pane, from: source)
+        Task { if await !askSystem(pane) { guide(pane, from: source) } }
     }
 
-    private func askSystem(_ pane: PermissionFlowPane) -> Bool {
+    private func askInBackground(_ pane: PermissionFlowPane) -> Bool {
+        Task { if await askSystem(pane) { onChange?(pane) } }
+        return false
+    }
+
+    /// The macOS requests that answer at once. nil: the pane answers later or has no request.
+    private func askNow(_ pane: PermissionFlowPane) -> Bool? {
         switch pane {
         case .accessibility: AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         case .screenRecording: CGRequestScreenCaptureAccess()
-        default: false
+        case .inputMonitoring: IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        default: nil
         }
+    }
+
+    private func askSystem(_ pane: PermissionFlowPane) async -> Bool {
+        if let answer = askNow(pane) { return answer }
+        switch pane {
+        case .microphone: return await Self.granted(MicrophonePermissionStatusProvider().requestAuthorization)
+        case .camera: return await Self.granted(CameraPermissionStatusProvider().requestAuthorization)
+        case .calendars: return await Self.granted(CalendarPermissionStatusProvider().requestAuthorization)
+        case .reminders: return await Self.granted(RemindersPermissionStatusProvider().requestAuthorization)
+        default: return false
+        }
+    }
+
+    private static func granted(
+        _ request: (@escaping @Sendable (PermissionAuthorizationState) -> Void) -> Void
+    ) async -> Bool {
+        await withCheckedContinuation { done in request { done.resume(returning: $0 == .granted) } }
     }
 
     private func guide(_ pane: PermissionFlowPane, from source: CGRect?) {

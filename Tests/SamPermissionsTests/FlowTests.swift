@@ -85,6 +85,23 @@ struct FlowTests {
         #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: true, tries: 2, settingsChanged: false) == .openPane)
     }
 
+    @Test func paneWithoutRequestOpensPane() {
+        for pane in PermissionFlowPane.allCases where !Flow.askable.contains(pane) {
+            #expect(Flow.step(.notAsked, pane: pane, identityChanged: false, tries: 0, settingsChanged: false) == .openPane)
+        }
+        #expect(Flow.step(.notAsked, pane: .microphone, identityChanged: false, tries: 0, settingsChanged: false) == .prompt)
+    }
+
+    @Test func liveGrantPaneNeverResetsOrReopens() {
+        for pane in PermissionFlowPane.allCases where !Flow.repairable.contains(pane) {
+            #expect(Flow.step(.denied, pane: pane, identityChanged: true, tries: 1, settingsChanged: true) == .openPane)
+        }
+    }
+
+    @Test @MainActor func panelNeverAsksForAccessibility() {
+        #expect(SamPermissions.flowConfiguration.promptForAccessibilityTrust == false)
+    }
+
     @Test func launchArgument() {
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask", "screenRecording"]) == .screenRecording)
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask"]) == nil)

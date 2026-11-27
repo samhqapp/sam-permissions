@@ -46,6 +46,12 @@ public enum Flow {
     /// Tries in a row with no change before the flow counts as stuck.
     public static let loopTries = 3
     public static let window: TimeInterval = 600
+    /// Panes with a macOS request. Every other pane goes straight to System Settings.
+    public static let askable: Set<PermissionFlowPane> = [.accessibility, .screenRecording, .inputMonitoring,
+                                                          .microphone, .camera, .calendars, .reminders]
+    /// Panes whose old-signature grant Fix repairs with a reset. Every other pane picks up a grant live
+    /// and never resets or reopens.
+    public static let repairable: Set<PermissionFlowPane> = [.accessibility, .screenRecording]
 
     public static func access(_ reading: Reading, asked: Bool, reopenedForGrant: Bool) -> Access {
         if reading.preflight { return .granted }
@@ -58,13 +64,17 @@ public enum Flow {
     /// after any Cancel or Deny it returns `.denied` at once, so the app shows its Fix banner.
     public static func request(_ access: Access, confirm: () -> Bool, ask: () -> Bool,
                                markAsked: () -> Void) -> Answer {
+        gate(access, confirm: confirm, markAsked: markAsked) ?? (ask() ? .granted : .denied)
+    }
+
+    /// The answer without asking macOS, or nil when the app should ask macOS now.
+    public static func gate(_ access: Access, confirm: () -> Bool, markAsked: () -> Void) -> Answer? {
         switch access {
         case .granted: return .granted
         case .denied, .needsRelaunch: return .denied
         case .notAsked:
             markAsked()
-            guard confirm() else { return .cancelled }
-            return ask() ? .granted : .denied
+            return confirm() ? nil : .cancelled
         }
     }
 
@@ -86,9 +96,9 @@ public enum Flow {
         switch access {
         case .granted: return .nothing
         case .needsRelaunch: return .reopen
-        case .notAsked: return .prompt
+        case .notAsked: return askable.contains(pane) ? .prompt : .openPane
         case .denied:
-            if tries + 1 >= loopTries { return .openPane }
+            if tries + 1 >= loopTries || !repairable.contains(pane) { return .openPane }
             // A row from an old signature stays on but denies us; a second click without change repairs it.
             guard identityChanged || tries >= 1 else { return .openPane }
             // The switch may be on but unseen by this process: reopen before a reset, never wipe a good grant.

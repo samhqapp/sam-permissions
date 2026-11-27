@@ -9,7 +9,8 @@ let package = Package(
     targets: [
         .target(name: "SamPermissions", dependencies: [
             .product(name: "PermissionFlow", package: "PermissionFlow"),
-            .product(name: "PermissionFlowScreenRecordingStatus", package: "PermissionFlow"),
+            .product(name: "PermissionFlowExtendedStatus", package: "PermissionFlow"),
+            .product(name: "PermissionFlowCameraStatus", package: "PermissionFlow"),
         ]),
         .testTarget(name: "SamPermissionsTests", dependencies: ["SamPermissions"]),
     ]
