@@ -24,7 +24,7 @@ Requires macOS 14 or later and Swift 6.1 or later.
 Add the package to your Swift Package Manager dependencies.
 
 ```swift
-.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.3.0")
+.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.3.1")
 ```
 
 Add the product to your app target's dependencies.
@@ -99,6 +99,8 @@ Call `guide(_:from:)` to send the user to a page that is not a privacy pane. It 
 ```swift
 SamPermissions.shared.guide(.automation(target: "com.apple.finder"), from: buttonFrame)
 ```
+
+Call `closeGuide()` when your app reads the approval itself, such as an `SMAppService.daemon` helper that waits in Login Items.
 
 ## Credits
 

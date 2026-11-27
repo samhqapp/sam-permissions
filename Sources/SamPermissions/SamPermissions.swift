@@ -163,6 +163,12 @@ public final class SamPermissions {
         show(page, from: source)
     }
 
+    /// Closes the panel beside System Settings, such as when the app reads its own helper's approval.
+    public func closeGuide() {
+        flow.closePanel()
+        settingsGuide.close()
+    }
+
     private func guide(_ pane: PermissionFlowPane, from source: CGRect?) {
         settingsChanged = false
         if pane.supportsFloatingAuthorizationPanel {
