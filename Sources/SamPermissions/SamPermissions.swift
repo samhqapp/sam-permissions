@@ -29,6 +29,7 @@ public final class SamPermissions {
 
     private let defaults = UserDefaults.standard
     private let flow = PermissionFlowController(configuration: flowConfiguration)
+    private let settingsGuide = SettingsGuide()
     private var resumed: PermissionFlowPane?
     private var settingsChanged = false
     private var watch: Task<Void, Never>?
@@ -155,10 +156,31 @@ public final class SamPermissions {
         await withCheckedContinuation { done in request { done.resume(returning: $0 == .granted) } }
     }
 
+    /// Opens a Settings page with the guide panel beside it, such as Login Items for a helper or Automation for
+    /// Apple Events. Call from a click; `source` is the button's frame in screen coordinates.
+    public func guide(_ page: SettingsPage, from source: CGRect? = nil) {
+        if case .permission(let pane) = page { return guide(pane, from: source) }
+        show(page, from: source)
+    }
+
     private func guide(_ pane: PermissionFlowPane, from source: CGRect?) {
         settingsChanged = false
-        flow.authorize(pane: pane, sourceFrameInScreen: source)
+        if pane.supportsFloatingAuthorizationPanel {
+            settingsGuide.close()
+            flow.authorize(pane: pane, sourceFrameInScreen: source)
+        } else {
+            show(.permission(pane), from: source)
+        }
         follow(pane)
+    }
+
+    private func show(_ page: SettingsPage, from source: CGRect?) {
+        flow.closePanel()
+        NSWorkspace.shared.open(page.url)
+        settingsGuide.show(page, from: source) { [weak self] in
+            if case .permission(let pane) = page { return self?.access(pane) == .granted }
+            return await page.granted()
+        }
     }
 
     /// Reads once a second for 10 min. A Screen Recording switch that goes on reopens the app by itself.
@@ -172,7 +194,7 @@ public final class SamPermissions {
                 let now = self.access(pane)
                 guard now != start else { continue }
                 self.onChange?(pane)
-                if now == .granted { self.flow.closePanel(); self.defaults.removeObject(forKey: self.key("tries", pane)) }
+                if now == .granted { self.flow.closePanel(); self.settingsGuide.close(); self.defaults.removeObject(forKey: self.key("tries", pane)) }
                 if now == .needsRelaunch { self.reopen(pane, [Self.resumeArgument, pane.rawValue]) }
                 return
             }

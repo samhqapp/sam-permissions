@@ -24,7 +24,7 @@ Requires macOS 14 or later and Swift 6.1 or later.
 Add the package to your Swift Package Manager dependencies.
 
 ```swift
-.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.2.0")
+.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.3.0")
 ```
 
 Add the product to your app target's dependencies.
@@ -72,17 +72,33 @@ The panel next to System Settings needs no extra permission.
 | Accessibility | macOS prompt | Pane and panel | Live |
 | Screen Recording | macOS prompt | Pane and panel | After one reopen if macOS keeps the old status |
 | Input Monitoring | macOS prompt | Pane and panel | Live |
-| Microphone | macOS prompt | Pane only | Live |
-| Camera | macOS prompt | Pane only | Live |
-| Calendars | macOS prompt | Pane only | Live |
-| Reminders | macOS prompt | Pane only | Live |
+| Microphone | macOS prompt | Pane and guide panel | Live |
+| Camera | macOS prompt | Pane and guide panel | Live |
+| Calendars | macOS prompt | Pane and guide panel | Live |
+| Reminders | macOS prompt | Pane and guide panel | Live |
 | Bluetooth | None | Pane and panel | Live |
 | Full Disk Access | None | Pane and panel | Live |
 | App Management | None | Pane and panel | No status from macOS |
 | Developer Tools | None | Pane and panel | No status from macOS |
 | Media & Apple Music | None | Pane and panel | Live |
 
-Microphone, camera, calendars, and reminders show only apps that asked, so their pane gets no drag panel. For a pane with no status, `access(_:)` never reads granted; check by using the feature. Fix repairs an old-signature grant with a reset only for Accessibility and Screen Recording.
+Microphone, camera, calendars, and reminders show only apps that asked, so they get SamPermissions' own panel instead of the drag panel: the same look, with one line such as "Turn on the switch next to Task Manager." For a pane with no status, `access(_:)` never reads granted; check by using the feature. Fix repairs an old-signature grant with a reset only for Accessibility and Screen Recording.
+
+### Other Settings pages
+
+Call `guide(_:from:)` to send the user to a page that is not a privacy pane. It opens the page and shows the guide panel under System Settings. The panel follows the window and closes when Settings closes or the status reads allowed.
+
+| Page | Panel closes when |
+| --- | --- |
+| `.loginItems` | `SMAppService.mainApp` is enabled, or Settings closes |
+| `.automation(target:)` | Apple Events to the target are allowed (checked without asking), or Settings closes |
+| `.locationServices` | Location access is allowed, or Settings closes |
+| `.localNetwork` | Settings closes (macOS gives no status) |
+| `.notifications` | Notifications are allowed, or Settings closes |
+
+```swift
+SamPermissions.shared.guide(.automation(target: "com.apple.finder"), from: buttonFrame)
+```
 
 ## Credits
 

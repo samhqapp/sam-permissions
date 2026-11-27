@@ -102,6 +102,13 @@ struct FlowTests {
         #expect(SamPermissions.flowConfiguration.promptForAccessibilityTrust == false)
     }
 
+    @Test func settingsPagesOpenTheRightPaneWithOneLine() {
+        #expect(SettingsPage.loginItems.url.absoluteString == "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")
+        #expect(SettingsPage.automation(target: "com.apple.finder").url.absoluteString.hasSuffix("?Privacy_Automation"))
+        #expect(SettingsPage.permission(.camera).url == PermissionFlowPane.camera.settingsURL)
+        #expect(SettingsPage.loginItems.line(app: "Task Manager") == "Turn on the switch next to Task Manager.")
+    }
+
     @Test func launchArgument() {
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask", "screenRecording"]) == .screenRecording)
         #expect(SamPermissions.pane(after: "--sam-permission-ask", in: ["app", "--sam-permission-ask"]) == nil)
