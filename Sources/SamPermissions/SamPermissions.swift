@@ -95,15 +95,26 @@ public final class SamPermissions {
         if let pane = Self.pane(after: Self.askArgument, in: arguments) { ask(pane, from: nil) }
     }
 
+    /// First use of a feature, such as a capture hotkey. `confirm` shows the app's own explanation and returns
+    /// true to go on. Only the first call explains and asks macOS; a Cancel or Deny is remembered, and every
+    /// later call returns `.denied` with no prompt, so the app shows its Fix banner instead.
+    public func request(_ pane: PermissionFlowPane, confirm: () -> Bool) -> Answer {
+        Flow.request(access(pane), confirm: confirm, ask: { askSystem(pane) },
+                     markAsked: { defaults.set(true, forKey: key("asked", pane)) })
+    }
+
     private func ask(_ pane: PermissionFlowPane, from source: CGRect?) {
         defaults.set(true, forKey: key("asked", pane))
-        switch pane {
-        case .accessibility:
-            _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
-        case .screenRecording: _ = CGRequestScreenCaptureAccess()
-        default: break
-        }
+        _ = askSystem(pane)
         guide(pane, from: source)
+    }
+
+    private func askSystem(_ pane: PermissionFlowPane) -> Bool {
+        switch pane {
+        case .accessibility: AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        case .screenRecording: CGRequestScreenCaptureAccess()
+        default: false
+        }
     }
 
     private func guide(_ pane: PermissionFlowPane, from source: CGRect?) {

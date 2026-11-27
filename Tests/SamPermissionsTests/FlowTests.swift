@@ -50,6 +50,24 @@ struct FlowTests {
         #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: true, tries: 1, settingsChanged: true) == .reopen)
     }
 
+    @Test func requestAsksOnlyOnce() {
+        var prompts = 0, asks = 0, marked = 0
+        func run(_ access: Access, confirm: Bool = true, allow: Bool = false) -> Answer {
+            Flow.request(access, confirm: { prompts += 1; return confirm }, ask: { asks += 1; return allow },
+                         markAsked: { marked += 1 })
+        }
+        #expect(run(.notAsked) == .denied)
+        #expect((prompts, asks, marked) == (1, 1, 1))
+        // Denied, then the hotkey again: no app prompt and no macOS prompt, only the Fix banner.
+        #expect(run(.denied) == .denied)
+        #expect(run(.needsRelaunch) == .denied)
+        #expect((prompts, asks) == (1, 1))
+        #expect(run(.notAsked, confirm: false) == .cancelled)
+        #expect((prompts, asks, marked) == (2, 1, 2))
+        #expect(run(.granted) == .granted)
+        #expect(run(.notAsked, allow: true) == .granted)
+    }
+
     @Test func denyAtPromptThenFixOpensPane() {
         #expect(Flow.step(.denied, pane: .screenRecording, identityChanged: false, tries: 0, settingsChanged: true) == .openPane)
     }

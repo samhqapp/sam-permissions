@@ -37,6 +37,11 @@ public enum Step: String, Sendable {
 }
 
 /// The rules, with no system calls, so they are unit tested.
+/// The result of a first-use request.
+public enum Answer: String, Sendable {
+    case granted, cancelled, denied
+}
+
 public enum Flow {
     /// Tries in a row with no change before the flow counts as stuck.
     public static let loopTries = 3
@@ -47,6 +52,20 @@ public enum Flow {
         // After our own reopen a new process must see the grant; titles without it mean the probe is wrong.
         if (reading.titledWindows ?? 0) > 0, !reopenedForGrant { return .needsRelaunch }
         return asked ? .denied : .notAsked
+    }
+
+    /// First use of a feature. Only a never-asked app explains (`confirm`) and asks macOS (`ask`);
+    /// after any Cancel or Deny it returns `.denied` at once, so the app shows its Fix banner.
+    public static func request(_ access: Access, confirm: () -> Bool, ask: () -> Bool,
+                               markAsked: () -> Void) -> Answer {
+        switch access {
+        case .granted: return .granted
+        case .denied, .needsRelaunch: return .denied
+        case .notAsked:
+            markAsked()
+            guard confirm() else { return .cancelled }
+            return ask() ? .granted : .denied
+        }
     }
 
     /// nil when granted.

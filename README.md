@@ -23,7 +23,7 @@ Requires macOS 14 or later and Swift 6.1 or later.
 Add the package to your Swift Package Manager dependencies.
 
 ```swift
-.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.1.3")
+.package(url: "https://github.com/samhqapp/sam-permissions.git", exact: "0.1.5")
 ```
 
 Add the product to your app target's dependencies.
@@ -57,6 +57,8 @@ struct MyApp: App {
 ```
 
 Set `SamPermissions.shared.onLoop` if you want your app to offer the report to the user.
+
+Call `request(_:confirm:)` when a feature first needs access, such as a capture hotkey. Only the first call runs `confirm` (your own explanation) and the macOS request. SamPermissions remembers a Cancel or Deny, so later calls return `.denied` with no prompt, and your app shows Fix. Never call `CGRequestScreenCaptureAccess` yourself.
 
 Call `reason(_:)` to pick the line you show beside Fix. It returns `nil` when access is granted, `.notAllowed` when the permission was never asked, switched off, or reset, `.staleGrant` when the switch is on for an old signature of the app, and `.needsRelaunch` when the switch is on but the app must restart to see it.
 
